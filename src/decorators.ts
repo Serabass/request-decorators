@@ -1,11 +1,13 @@
 import "reflect-metadata";
-import { RequestMethodOptions } from "./RequestMethodOptions";
+import { RequestMethodOptions, RequestServiceOptions } from "./options";
 import { RequestMethod } from "./RequestMethod";
 import rp from "request-promise";
 
+const metaDataKey = "restMethods";
+
 export const Request = function (options: RequestMethodOptions | string) {
     return function (target: any, propertyKey: string) {
-        let restMethods = Reflect.getMetadata("restMethods", target);
+        let restMethods = Reflect.getMetadata(metaDataKey, target);
 
         if (typeof options === "string") {
             options = <RequestMethodOptions>{
@@ -29,13 +31,13 @@ export const Request = function (options: RequestMethodOptions | string) {
             key: propertyKey,
             options
         });
-        Reflect.defineMetadata("restMethods", restMethods, target);
+        Reflect.defineMetadata(metaDataKey, restMethods, target);
     };
 };
 
-export const RequestService = function (options: any): ClassDecorator {
+export const RequestService = function (options: RequestServiceOptions): ClassDecorator {
     return function (target: any) {
-        let restMethods: any[] = Reflect.getMetadata("restMethods", target.prototype);
+        let restMethods: any[] = Reflect.getMetadata(metaDataKey, target.prototype);
 
         for (let rq of restMethods) {
             let {options: rqOptions} = rq;
@@ -44,16 +46,19 @@ export const RequestService = function (options: any): ClassDecorator {
             rqOptions.uri = rqOptions.uri.replace(/^\//, "");
 
             target.prototype[rq.key] = function (args: any = {}) {
-                rqOptions.uri = `${options.baseUri}/${rqOptions.uri}`;
-                rqOptions.uri = rqOptions.uri.replace(/:(\w+)/, (input: string, argName: any, pos: number, source: string) => {
+                let queryOptions = {
+                    ...rqOptions
+                };
+                queryOptions.uri = `${options.baseUri}/${queryOptions.uri}`;
+                queryOptions.uri = queryOptions.uri.replace(/:(\w+)/, (input: string, argName: any) => {
                     let value = args[argName];
                     delete args[argName];
                     return value;
                 });
-                rqOptions.formData = args;
-                return (<any>rp)(rqOptions).then((res: any) => {
-                    if (rqOptions.prepareResult) {
-                        res = rqOptions.prepareResult(res);
+                queryOptions.formData = args;
+                return (<any>rp)(queryOptions).then((res: any) => {
+                    if (queryOptions.prepareResult) {
+                        res = queryOptions.prepareResult(res);
                     }
 
                     return res;
@@ -63,7 +68,7 @@ export const RequestService = function (options: any): ClassDecorator {
     };
 };
 
-["get", "post", "put", "delete", "patch", "head"].forEach((method: string) => {
+["get", "post", "put", "delete", "patch", "head", "options"].forEach((method: string) => {
     (<any>Request)[method] = function (options: any) {
         if (typeof options === "string") {
             options = <RequestMethodOptions>{

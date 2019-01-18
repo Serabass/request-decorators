@@ -6,3 +6,7 @@ export interface RequestMethodOptions {
     json?: boolean;
     transform?: (body: any, response: any, resolveWithFullResponse: boolean) => any;
 }
+
+export interface RequestServiceOptions {
+    baseUri: string;
+}
